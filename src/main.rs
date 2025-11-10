@@ -25,9 +25,25 @@ impl TraceContext {
     }
 }
 
-fn trace_middleware<B>(mut req: Request<B>, next: Next) -> impl IntoResponse {
+async fn trace_middleware<B>(mut req: Request<B>, next: Next) -> impl IntoResponse {
     let headers = req.headers();
-    
+    let (trace_ctx, incoming_parent_id) = if let Some(tp) = headers.get("traceparent") {
+        if let Ok(s) = tp.to_str() {
+            if let Some((trace_id, parent)) = parse_traceparent(s) {
+                let ctx = TraceContext {
+                    trace_id: trace_id,
+                    spans: Arc::new(Mutex::new(Vec::new()))
+                };
+                (ctx, Some(parent))
+            } else {
+                (TraceContext::new(), None)
+            }
+        } else {
+            (TraceContext::new(), None)
+        }
+    } else {
+         (TraceContext::new(), None) 
+    };
 }
 
 #[tokio::main]
