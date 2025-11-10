@@ -97,6 +97,7 @@ async fn trace_middleware(mut req: Request<axum::body::Body>, next: Next) -> imp
 
     let root_span_id = trace_ctx.start_span(root_name, incoming_parent_id);
     req.extensions_mut().insert(trace_ctx.clone());
+    req.extensions_mut().insert(root_span_id.clone());
 
     let response = next.run(req).await;
 
@@ -117,7 +118,7 @@ async fn trace_middleware(mut req: Request<axum::body::Body>, next: Next) -> imp
     response
 }
 
-async fn get_user_handler(ctx_ext: Option<axum::extract::Extension<TraceContext>>) -> impl IntoResponse {
+async fn get_user_handler(ctx_ext: Option<axum::extract::Extension<TraceContext>>, root_span_ext: Option<axum::extract::Extension<String>>, ) -> impl IntoResponse {
     let ctx = match ctx_ext {
         Some(axum::extract::Extension(c)) => c,
         None => {
@@ -125,9 +126,11 @@ async fn get_user_handler(ctx_ext: Option<axum::extract::Extension<TraceContext>
         }
     };
 
-    let route_span = ctx.start_span("Users route hit", None);
-    let db_span = ctx.start_span("DB query execution", Some(route_span.clone()));
+    let root_span_id = root_span_ext.map(|ext| ext.0);
 
+    let route_span = ctx.start_span("Users route hit", root_span_id);
+    let db_span = ctx.start_span("DB query execution", Some(route_span.clone()));
+    tokio::time::sleep(Duration::from_millis(40)).await;
     ctx.end_span(&db_span);
     tokio::time::sleep(Duration::from_millis(80)).await;
     ctx.end_span(&route_span);
