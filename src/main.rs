@@ -25,6 +25,17 @@ impl TraceContext {
     }
 }
 
+fn parse_traceparent(header_val: &str) -> Option<(String, String)> {
+    let parts: Vec<&str> = header_val.split("-").collect();
+    if parts.len() >= 4 {
+        let trace_id = parts[1].to_string();
+        let parent = parts[2].to_string();
+        Some((trace_id, parent))
+    }else {
+        None
+    }
+}
+
 async fn trace_middleware<B>(mut req: Request<B>, next: Next) -> impl IntoResponse {
     let headers = req.headers();
     let (trace_ctx, incoming_parent_id) = if let Some(tp) = headers.get("traceparent") {
